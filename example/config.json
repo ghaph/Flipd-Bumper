@@ -1,0 +1,8 @@
+{
+	"username": "",
+	"password": "",
+	"2fa": true,
+	"threads": ["thread 1", "thread 2"],
+	"messages": ["autobumping this", "autobumper"],
+	"interval": 15
+}
