@@ -7,6 +7,7 @@ import json
 import random
 
 # login page
+turnstileSelector = 'document.querySelector("#cf-stage > div.ctp-checkbox-container > label")?.click()'
 usernameSelector = '#fullcontainment > div > form:nth-child(2) > div > div.container.mt-4 > div > div.col-md-6.bg-container.py-4.px-5.rounded-right.rounded-xs > div > span > div:nth-child(1) > span > label > input'
 passwordSelector = '#fullcontainment > div > form:nth-child(2) > div > div.container.mt-4 > div > div.col-md-6.bg-container.py-4.px-5.rounded-right.rounded-xs > div > span > div:nth-child(3) > label > input'
 mfaFieldSelector = '#fullcontainment > div > form:nth-child(2) > div > div.container.mt-4 > div > div.col-md-6.bg-container.py-4.px-5.rounded-right.rounded-xs > div > span > div:nth-child(5) > label > input'
@@ -68,15 +69,79 @@ def login():
 
     options = uc.ChromeOptions()
 
+    if 'user_agent' in config:
+        options.add_argument(f'user-agent={config["user_agent"]}')
+
     # set window to 1920x1080
     options.add_argument('--window-size=1920,1080')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-extensions')
-    if os.path.exists('/usr/bin/chromium-browser'):
-        options.binary_location = '/usr/bin/chromium-browser'
+
+    binary_locations = [
+        '/snap/bin/brave',
+        '/usr/bin/chromium-browser',
+        'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+    ]
+
+    for loc in binary_locations:
+        if os.path.exists(loc):
+            options.binary_location = loc
+            break
 
     driver = uc.Chrome(driver_executable_path=path, options=options)
     log('Driver started')
+
+    # i was jsut testing. i dont think setting this does anything meaningful
+    if 'clearance' in config:
+        # get flipd to apply the clearance cookie
+        driver.get('https://flipd.gg')
+
+        driver.add_cookie({
+            'domain': '.flipd.gg',
+            'hostOnly': False,
+            'httpOnly': True,
+            'name': 'cf_clearance',
+            'path': '/',
+            'sameSite': 'None',
+            'secure': True,
+            'value': config['clearance'],
+        })
+        log('Applied clearance cookie')
+
+    # very hit or miss. doesnt seem to bypass turnstile always
+    def check_turnstile():
+        try:
+            # get all frames
+            frames = driver.find_elements(By.TAG_NAME, 'iframe')
+            if len(frames) == 0:
+                return
+            
+            for frame in frames:
+                src = frame.get_attribute('src')
+                log(f'Found iframe: {src}')
+
+                # make sure its a turnstile iframe
+                if not 'challenges.cloudflare.com' in src:
+                    continue
+
+                log('Found turnstile iframe')
+
+                # switch to frame
+                driver.switch_to.frame(frame)
+
+                # click checkbox
+                driver.execute_script(turnstileSelector)
+                log('Clicked turnstile checkbox')
+
+                time.sleep(0.5)
+
+                # save screenshot for debug
+                driver.save_screenshot('turnstile.png')
+
+                driver.switch_to.default_content()
+                return
+        except:
+            pass
+
+        driver.switch_to.default_content()
 
     driver.get('https://flipd.gg/member.php?action=login')
     log('Opened login page')
@@ -96,6 +161,8 @@ def login():
         except:
             # take screenshot
             driver.save_screenshot('error.png')
+
+            check_turnstile()
 
             time.sleep(1)
     
@@ -191,6 +258,8 @@ def login():
                     log(f'[{id}] Bumped thread: {msg}')
                 except Exception as e:
                     print(e)
+
+                    check_turnstile()
 
                     total_errors += 1
                     if total_errors >= 10:
