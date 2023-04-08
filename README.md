@@ -7,3 +7,5 @@
 3. Install brave browser (optional but recommended)
 4. Run `pip install -r requirements.txt`
 5. Start bumper.py
+
+If you found this helpful consider [repping me :)](https://flipd.gg/member.php?action=profile&uid=446973)
