@@ -6,6 +6,9 @@ import threading
 import json
 import random
 
+# only enable if other mode doesn't work
+quickReplyEnabled = False
+
 # login page
 turnstileSelector = 'document.querySelector("#cf-stage > div.ctp-checkbox-container > label")?.click()'
 usernameSelector = '#fullcontainment > div > form:nth-child(2) > div > div.container.mt-4 > div > div.col-md-6.bg-container.py-4.px-5.rounded-right.rounded-xs > div > span > div:nth-child(1) > span > label > input'
@@ -19,9 +22,14 @@ repSelector = '#fullcontainment > div.wraps > div.forum_sidebar > div.responsive
 loggedInUsernameSelector = '#fullcontainment > div.wraps > div.forum_sidebar > div.responsivehide.sidebarstats.drop-shadow-lg > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > a'
 likesSelector = '#fullcontainment > div.wraps > div.forum_sidebar > div.responsivehide.sidebarstats.drop-shadow-lg > div:nth-child(2) > div:nth-child(3) > strong'
 
-# thread page
+# quick reply
 replyMessageSelector = '#message'
 postReplySelector = '#quick_reply_submit'
+
+# regular reply
+toggleCodeEditorSelector = '#fullcontainment > div.wraps > form > table > tbody > tr:nth-child(4) > td > div > div.sceditor-toolbar > div:nth-child(8) > a.sceditor-button.sceditor-button-source'
+replyTextAreaSelector = '#fullcontainment > div.wraps > form > table > tbody > tr:nth-child(4) > td > div > textarea'
+regularReplyPostSelector = '#fullcontainment > div.wraps > form > div.responsivehide > input:nth-child(1)'
 
 with open('config.json') as f:
     config = json.load(f)
@@ -73,7 +81,9 @@ def login():
         options.add_argument(f'user-agent={config["user_agent"]}')
 
     # set window to 1920x1080
-    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--window-size=10,10')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-extensions')
 
     binary_locations = [
         '/snap/bin/brave',
@@ -88,6 +98,12 @@ def login():
 
     driver = uc.Chrome(driver_executable_path=path, options=options)
     log('Driver started')
+
+    def set_size():
+        # force window size
+        driver.set_window_size(1920, 1080)
+
+    set_size()
 
     # i was jsut testing. i dont think setting this does anything meaningful
     if 'clearance' in config:
@@ -246,14 +262,26 @@ def login():
                 if id != thread_ids[0]:
                     time.sleep(15)
 
-                try:
-                    driver.get('https://flipd.gg/showthread.php?tid=' + str(id))
+                set_size()
 
+                try:
                     msg = get_message()
 
-                    driver.find_element(By.CSS_SELECTOR, replyMessageSelector).send_keys(msg)
-                    driver.find_element(By.CSS_SELECTOR, postReplySelector).click()
-                    total_errors = 0
+                    if quickReplyEnabled:
+                        driver.get('https://flipd.gg/showthread.php?tid=' + str(id))
+
+                        msg = get_message()
+
+                        driver.find_element(By.CSS_SELECTOR, replyMessageSelector).send_keys(msg)
+                        driver.find_element(By.CSS_SELECTOR, postReplySelector).click()
+                        total_errors = 0
+                    else:
+                        driver.get('https://flipd.gg/newreply.php?tid=' + str(id))
+
+                        driver.find_element(By.CSS_SELECTOR, toggleCodeEditorSelector).click()
+                        driver.find_element(By.CSS_SELECTOR, replyTextAreaSelector).send_keys(msg)
+                        driver.find_element(By.CSS_SELECTOR, regularReplyPostSelector).click()
+                        total_errors = 0
 
                     log(f'[{id}] Bumped thread: {msg}')
                 except Exception as e:
