@@ -9,3 +9,4 @@
 5. Start bumper.py
 
 If you found this helpful consider [repping me :)](https://flipd.gg/member.php?action=profile&uid=446973)
+Do not contact for help, I will not help you.
